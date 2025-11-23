@@ -1,0 +1,16 @@
+numpy
+jupyter
+jupyter-notebook
+matplotlib
+seaborn
+plotly
+graphviz
+dtale
+pandas
+Pillow
+psutil
+scikit-learn
+scipy
+torch --index-url https://download.pytorch.org/whl/cpu
+torchvision --index-url https://download.pytorch.org/whl/cpu
+wandb
