@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Neural Network 7-Segment Intuition</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      gap: 450px;
+      margin: 20px;
+      background: #111;
+    }
+    .segments, .digits {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      
+    }
+    .segment img {
+      width: 60px;
+      height: 90px;
+      border: 1px solid #aaa;
+      cursor: pointer;
+      background: #111;
+    }
+    .segment.active img {
+      background: #156300;
+    }
+    .digit {
+      width: 60px;
+      height: 60px;
+      border: 1px solid #aaa;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: larger;
+      position: relative;
+      color: #bebebe;
+      overflow: hidden; /* so the fill stays inside */
+    }
+
+    .digit .fill {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 0%; /* will scale with probability */
+      background: rgba(0, 128, 255, 0.6); /* semi-transparent blue */
+      z-index: 0; /* behind the text */
+    }
+ 
+    .digit span {
+      position: relative;
+      z-index: 1;
+    }
+    .digit .prob {
+      position: absolute;
+      right: -35px;
+      font-size: 12px;
+      color: #bebebe;
+    }
+    .digitRow {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .info {
+      display: flex;
+      flex-direction: column;
+      font-size: 12px;
+      color: #ccc;
+      min-width: 50px;
+    }
+    svg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+    }
+    line.link {
+      cursor: pointer;
+      pointer-events: all;
+    }
+  </style>
+</head>
+<body>
+  <div class="segments" id="segments"></div>
+  <div class="digits" id="digits"></div>
+  <svg id="links"></svg>
+
+  <script>
+    const segmentNames = ["Bottom","Lower Left","Upper Left","Top","Upper Right","Lower Right","Middle"];
+    const digits = Array.from({length:10}, (_,i)=>i);
+
+    const segDiv = document.getElementById('segments');
+    const digDiv = document.getElementById('digits');
+    const svg = document.getElementById('links');
+
+    // Create segment divs with images
+    const segEls = segmentNames.map((name,i)=>{
+      const el = document.createElement('div');
+      el.className = 'segment';
+      el.dataset.index = i;
+
+      const img = document.createElement('img');
+      img.src = `segments/seg${i}.png`; // <-- your 7 images named seg0.png ... seg6.png
+      el.appendChild(img);
+
+      el.addEventListener('click', ()=>{
+        el.classList.toggle('active');
+        updateProbs();
+      });
+      segDiv.appendChild(el);
+      return el;
+    });
+
+    // Create digit divs
+    const digEls = digits.map((d,i)=>{
+      // digit class
+      const el = document.createElement('div');
+      el.className = 'digit';
+      // fill div digit 
+      const fill = document.createElement('div');
+      fill.className = 'fill';
+      el.appendChild(fill);
+      // digit number show up
+      const num = document.createElement('span');
+      num.textContent = d;
+      el.appendChild(num);
+      // add option to click & change links
+      el.addEventListener('click', () => {
+        const newVal = parseFloat(prompt(`Set ALL incoming weights for digit ${d}:`, "0"));
+        if (!isNaN(newVal)) {
+          // update weights for every segment → this digit
+          for (let si = 0; si < 7; si++) {
+            weights[si][d] = newVal;
+          }
+          // recolor the corresponding links
+          Array.from(svg.querySelectorAll('line.link')).forEach(line => {
+            if (parseInt(line.dataset.di) === d) {
+              line.setAttribute('stroke', weightToColor(newVal, 0.6));
+            }
+          });
+          updateProbs();
+        }
+      });
+      //info object to store the shown values (sum, prob)
+      const info = document.createElement('div');
+      info.className = 'info';
+      const scoreDiv = document.createElement('div');
+      scoreDiv.className = 'score';
+      scoreDiv.textContent = "0.00";
+      const probDiv = document.createElement('div');
+      probDiv.className = 'prob';
+      probDiv.textContent = "0.00";
+      info.appendChild(scoreDiv);
+      info.appendChild(probDiv);
+
+      // wrapper for digit + info
+      const row = document.createElement('div');
+      row.className = 'digitRow';
+      row.appendChild(el);
+      row.appendChild(info);
+
+      digDiv.appendChild(row);
+      return {el,fill, score:scoreDiv, prob:probDiv};
+    });
+
+    // Initialize weights (segments x digits)
+    let weights = Array.from({length:7}, ()=>Array(10).fill(0));
+
+    // Draw links
+    function drawLinks() {
+      svg.innerHTML = '';
+      const segRects = segEls.map(el=>el.getBoundingClientRect());
+      const digRects = digEls.map(obj=>obj.el.getBoundingClientRect());
+      const svgRect = svg.getBoundingClientRect();
+      svg.setAttribute('width', window.innerWidth);
+      svg.setAttribute('height', window.innerHeight);
+
+      segRects.forEach((sr,si)=>{
+        digRects.forEach((dr,di)=>{
+          const x1 = sr.right - svgRect.left;
+          const y1 = sr.top + sr.height/2 - svgRect.top;
+          const x2 = dr.left - svgRect.left;
+          const y2 = dr.top + dr.height/2 - svgRect.top;
+          const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+          line.setAttribute('x1',x1);
+          line.setAttribute('y1',y1);
+          line.setAttribute('x2',x2);
+          line.setAttribute('y2',y2);
+          line.classList.add('link');
+          line.dataset.si = si;
+          line.dataset.di = di;
+          line.setAttribute('stroke', weightToColor(weights[si][di], 0.6));
+          strw = segEls[si].classList.contains('active') ? 4 : 2;
+          line.setAttribute('stroke-width', strw);          
+          line.addEventListener('click',()=>{
+            const newVal = parseFloat(prompt(`Weight from segment ${segmentNames[si]} to digit ${di}:`, weights[si][di]));
+            if(!isNaN(newVal)) {
+              weights[si][di] = newVal;
+              updateProbs();
+            }
+          });
+          line.addEventListener('mouseover',()=>{
+            line.setAttribute('stroke', weightToColor(weights[si][di], 1)); 
+            strw = segEls[si].classList.contains('active') ? 4 : 2;
+            line.setAttribute('stroke-width', strw+1); 
+          }); //line.classList.add('active'));
+          line.addEventListener('mouseout',()=>{
+            line.setAttribute('stroke', weightToColor(weights[si][di], 0.6));
+            strw = segEls[si].classList.contains('active') ? 4 : 2;  
+            line.setAttribute('stroke-width', strw); 
+          }); //line.classList.remove('active'));
+          svg.appendChild(line);
+        });
+      });
+    }
+
+    function softmax(arr){
+      const max = Math.max(...arr);
+      const exps = arr.map(v=>Math.exp(v-max));
+      const sum = exps.reduce((a,b)=>a+b,0);
+      return exps.map(v=>v/sum);
+    }
+
+    function updateProbs(){
+      const active = segEls.map(el=>el.classList.contains('active')?1:0);
+      const scores = digits.map(d=>{
+        return active.reduce((sum, act, si)=>sum + act*weights[si][d], 0);
+      });
+      const probs = softmax(scores);
+      probs.forEach((p,i)=>{
+        digEls[i].score.textContent = "∑=" + scores[i].toFixed(2);
+        digEls[i].prob.textContent = "prob=" + p.toFixed(2);
+        digEls[i].fill.style.height = (p*100) + "%";
+      });
+      Array.from(svg.querySelectorAll('line.link')).forEach(line => {
+        const si = parseInt(line.dataset.si);
+        const activeSeg = segEls[si].classList.contains('active');
+        line.setAttribute('stroke-width', activeSeg ? 4 : 2);
+      });
+      // recolor links
+      /*
+      Array.from(svg.querySelectorAll('line.link')).forEach((line, idx)=>{
+        const si = Math.floor(idx/10);
+        const di = idx % 10;
+        line.setAttribute('stroke', weightToColor(weights[si][di]), 0.6);
+        line.setAttribute('stroke-width', 2); 
+    });*/
+
+    }
+
+    function weightToColor(w,alpha=1) {
+      // clamp to [-1,1]
+      const v = Math.max(-1, Math.min(1, w));
+      if (v >= 0) {
+        // interpolate white → green
+        const g = Math.round(255 * v);
+        return `rgb(${255-g},255,${255-g},${alpha})`;
+      } else {
+        // interpolate white → red
+        const r = Math.round(255 * (-v));
+        return `rgb(255,${255-r},${255-r},${alpha})`;
+      }
+    }
+
+    window.addEventListener('resize',drawLinks);
+    window.addEventListener('load',()=>{
+      drawLinks();
+      updateProbs();
+    });
+  </script>
+</body>
+</html>

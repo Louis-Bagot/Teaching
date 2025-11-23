@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Neural Network 7-Segment Intuition</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      gap: 50px;
+      margin: 20px;
+    }
+    .segments {
+      display: grid;
+      grid-template-columns: 60px 60px;
+      grid-template-rows: repeat(3, 60px);
+      gap: 10px;
+      position: relative;
+    }
+    .segment {
+      width: 60px;
+      height: 20px;
+      background: #eee;
+      border: 1px solid #aaa;
+      cursor: pointer;
+      text-align: center;
+      line-height: 20px;
+      user-select: none;
+    }
+    .segment.active {
+      background: #ff4136;
+      color: white;
+    }
+    .digits {
+      display: grid;
+      grid-template-columns: repeat(5, 40px);
+      grid-gap: 15px;
+    }
+    .digit {
+      width: 40px;
+      height: 40px;
+      border: 1px solid #aaa;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      position: relative;
+    }
+    .digit .prob {
+      position: absolute;
+      bottom: -18px;
+      font-size: 12px;
+      color: #333;
+    }
+    svg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+    }
+    line.link {
+      stroke: rgba(0,0,0,0.1);
+      stroke-width: 2;
+      cursor: pointer;
+      pointer-events: all;
+    }
+    line.link.active {
+      stroke: rgba(0,0,0,0.7);
+    }
+  </style>
+</head>
+<body>
+  <div class="segments" id="segments"></div>
+  <div class="digits" id="digits"></div>
+  <svg id="links"></svg>
+
+  <script>
+    const segmentNames = ["Top","Upper L","Upper R","Middle","Lower L","Lower R","Bottom"];
+    const digits = Array.from({length:10}, (_,i)=>i);
+
+    const segDiv = document.getElementById('segments');
+    const digDiv = document.getElementById('digits');
+    const svg = document.getElementById('links');
+
+    // Create segment divs
+    const segEls = segmentNames.map((name,i)=>{
+      const el = document.createElement('div');
+      el.className = 'segment';
+      el.textContent = name;
+      el.dataset.index = i;
+      el.addEventListener('click', ()=>{
+        el.classList.toggle('active');
+        updateProbs();
+      });
+      segDiv.appendChild(el);
+      return el;
+    });
+
+    // Create digit divs
+    const digEls = digits.map((d,i)=>{
+      const el = document.createElement('div');
+      el.className = 'digit';
+      el.textContent = d;
+      const prob = document.createElement('div');
+      prob.className = 'prob';
+      prob.textContent = "0.0";
+      el.appendChild(prob);
+      digDiv.appendChild(el);
+      return {el,prob};
+    });
+
+    // Initialize weights (segments x digits)
+    let weights = Array.from({length:7}, ()=>Array(10).fill(0));
+
+    // Draw links
+    function drawLinks() {
+      svg.innerHTML = '';
+      const segRects = segEls.map(el=>el.getBoundingClientRect());
+      const digRects = digEls.map(obj=>obj.el.getBoundingClientRect());
+      const svgRect = svg.getBoundingClientRect();
+      svg.setAttribute('width', window.innerWidth);
+      svg.setAttribute('height', window.innerHeight);
+
+      segRects.forEach((sr,si)=>{
+        digRects.forEach((dr,di)=>{
+          const x1 = sr.right - svgRect.left;
+          const y1 = sr.top + sr.height/2 - svgRect.top;
+          const x2 = dr.left - svgRect.left;
+          const y2 = dr.top + dr.height/2 - svgRect.top;
+          const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+          line.setAttribute('x1',x1);
+          line.setAttribute('y1',y1);
+          line.setAttribute('x2',x2);
+          line.setAttribute('y2',y2);
+          line.classList.add('link');
+          line.addEventListener('click',()=>{
+            const newVal = parseFloat(prompt(`Weight from ${segmentNames[si]} to ${di}:`, weights[si][di]));
+            if(!isNaN(newVal)) {
+              weights[si][di] = newVal;
+              updateProbs();
+            }
+          });
+          line.addEventListener('mouseover',()=>line.classList.add('active'));
+          line.addEventListener('mouseout',()=>line.classList.remove('active'));
+          svg.appendChild(line);
+        });
+      });
+    }
+
+    function softmax(arr){
+      const max = Math.max(...arr);
+      const exps = arr.map(v=>Math.exp(v-max));
+      const sum = exps.reduce((a,b)=>a+b,0);
+      return exps.map(v=>v/sum);
+    }
+
+    function updateProbs(){
+      const active = segEls.map(el=>el.classList.contains('active')?1:0);
+      const scores = digits.map(d=>{
+        return active.reduce((sum, act, si)=>sum + act*weights[si][d], 0);
+      });
+      const probs = softmax(scores);
+      probs.forEach((p,i)=>{
+        digEls[i].prob.textContent = p.toFixed(2);
+      });
+    }
+
+    window.addEventListener('resize',drawLinks);
+    window.addEventListener('load',()=>{
+      drawLinks();
+      updateProbs();
+    });
+  </script>
+</body>
+</html>
