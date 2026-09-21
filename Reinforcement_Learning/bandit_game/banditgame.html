@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Multi-Armed Bandits</title>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        text-align: center;
+    }
+    .bandit {
+        display: inline-block;
+        margin: 10px;
+    }
+    .bandit img {
+        width: 150px;
+        height: 150px;
+    }
+    .result {
+        font-size: 14px;
+    }
+</style>
+</head>
+<body onload="startGame()">
+<div id="bandits"></div>
+<div id="total">Total: 0</div> <!-- New div for the total line -->
+
+<script>
+let totalReward = 0; // Variable to store the total reward
+
+function gaussianRand(mean, stddev) {
+    let u = 0, v = 0;
+    while (u === 0) u = Math.random();
+    while (v === 0) v = Math.random();
+    let num = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+    return mean + stddev * num;
+}
+
+function sampleBandit(index) {
+    let mean, stddev;
+    if (index === 0) {
+        mean = -.5;
+        stddev = 1;
+    } else if (index === 1) {
+        mean = 0;
+        stddev = 1;
+    } else if (index === 2) {
+        mean = 0.5;
+        stddev = 1;
+    }
+    const reward = gaussianRand(mean, stddev);
+    totalReward += reward; // Update total reward
+    return reward;
+}
+
+function startGame() {
+    const banditsDiv = document.getElementById('bandits');
+    banditsDiv.innerHTML = '';
+
+    for (let i = 0; i < 3; i++) {
+        const banditDiv = document.createElement('div');
+        banditDiv.classList.add('bandit');
+        const img = document.createElement('img');
+        img.src = 'bandit.png';
+        img.alt = `Bandit ${i + 1}`;
+        banditDiv.appendChild(img);
+        banditDiv.appendChild(document.createElement('br'));
+	const resultDiv = document.createElement('div');
+        resultDiv.classList.add('result');
+        const button = document.createElement('button');
+        button.textContent = 'Pull Arm';
+        button.onclick = () => {
+            const result = sampleBandit(i);
+            resultDiv.innerHTML += `<div>Reward: ${result.toFixed(2)}</div>`;	    updateTotal();
+        };
+        banditDiv.appendChild(button);
+        banditsDiv.appendChild(banditDiv);
+        banditDiv.appendChild(resultDiv);
+    }
+}
+
+function updateTotal() {
+    const totalDiv = document.getElementById('total');
+    totalDiv.textContent = `Total: ${totalReward.toFixed(2)}`;
+}
+
+</script>
+</body>
+</html>
+
